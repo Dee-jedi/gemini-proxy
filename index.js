@@ -21,34 +21,57 @@ app.use(
   })
 );
 
-// API Endpoint
+// Regular chat endpoint
 app.post('/chat', async (req, res) => {
   try {
     const { message } = req.body;
     if (!message) return res.status(400).json({ error: 'No message provided' });
 
-    // CORRECTED MODEL INITIALIZATION
     const model = genAI.getGenerativeModel({
-      model: 'gemini-1.5-pro-latest', // Updated model name
+      model: 'gemini-1.5-pro-latest',
     });
 
-    // SIMPLIFIED API CALL
     const result = await model.generateContent(message);
     const response = await result.response;
 
     res.json({ text: response.text() });
   } catch (error) {
-    console.error('API Error:', {
-      message: error.message,
-      stack: error.stack,
-      request: req.body,
-    });
-
+    console.error('API Error:', error);
     res.status(500).json({
       error: 'AI request failed',
       details:
         process.env.NODE_ENV === 'development' ? error.message : undefined,
     });
+  }
+});
+
+// Streaming endpoint
+app.post('/chat-stream', async (req, res) => {
+  try {
+    const { message } = req.body;
+    if (!message) return res.status(400).json({ error: 'No message provided' });
+
+    const model = genAI.getGenerativeModel({
+      model: 'gemini-1.5-pro-latest',
+    });
+
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+
+    const result = await model.generateContentStream(message);
+    let fullText = '';
+
+    for await (const chunk of result.stream) {
+      const chunkText = chunk.text();
+      fullText += chunkText;
+      res.write(`data: ${JSON.stringify({ text: fullText })}\n\n`);
+    }
+
+    res.end();
+  } catch (error) {
+    console.error('Stream Error:', error);
+    res.status(500).end();
   }
 });
 
