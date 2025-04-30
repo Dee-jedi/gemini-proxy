@@ -6,7 +6,7 @@ const cors = require('cors');
 const app = express();
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-// Enhanced middleware setup
+// Middleware
 app.use(cors());
 app.use(
   express.json({
@@ -21,70 +21,36 @@ app.use(
   })
 );
 
-// Request validation middleware
-app.use((req, res, next) => {
-  if (req.method === 'POST' && !req.is('application/json')) {
-    return res
-      .status(415)
-      .json({ error: 'Content-Type must be application/json' });
-  }
-  next();
-});
-
-// Robust chat endpoint
+// API Endpoint
 app.post('/chat', async (req, res) => {
   try {
-    console.log('Incoming request body:', req.body);
-
-    if (!req.body || typeof req.body !== 'object') {
-      return res.status(400).json({ error: 'Invalid request format' });
-    }
-
     const { message } = req.body;
-    if (!message || typeof message !== 'string') {
-      return res
-        .status(400)
-        .json({ error: 'Message must be a non-empty string' });
-    }
+    if (!message) return res.status(400).json({ error: 'No message provided' });
 
-    console.log('Initializing Gemini model...');
+    // CORRECTED MODEL INITIALIZATION
     const model = genAI.getGenerativeModel({
-      model: 'gemini-pro', // Use the correct model name
+      model: 'gemini-1.5-pro-latest', // Updated model name
     });
 
-    console.log('Sending to Gemini:', message.substring(0, 50) + '...');
-    const result = await model.generateContent(message); // Simplified call
-
+    // SIMPLIFIED API CALL
+    const result = await model.generateContent(message);
     const response = await result.response;
-    const text = response.text();
-    console.log('Received response from Gemini');
 
-    return res.json({ text });
+    res.json({ text: response.text() });
   } catch (error) {
-    console.error('Full Error:', {
+    console.error('API Error:', {
       message: error.message,
       stack: error.stack,
-      request: {
-        headers: req.headers,
-        body: req.body,
-      },
+      request: req.body,
     });
 
-    return res.status(500).json({
-      error: 'AI processing failed',
+    res.status(500).json({
+      error: 'AI request failed',
       details:
         process.env.NODE_ENV === 'development' ? error.message : undefined,
     });
   }
 });
 
-// Health check endpoint
-app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'healthy' });
-});
-
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
-});
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
