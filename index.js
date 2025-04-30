@@ -26,7 +26,7 @@ app.use(
       try {
         JSON.parse(buf.toString());
       } catch (e) {
-        res.status(400).json({ error: 'Invalid JSON format' });
+        throw new Error('Invalid JSON format');
       }
     },
     limit: '10kb',
@@ -96,7 +96,6 @@ app.post('/chat-stream', async (req, res) => {
         const chunkText = chunk.text();
         fullText += chunkText;
         res.write(`data: ${JSON.stringify({ text: fullText })}\n\n`);
-        // Flush the response if supported
         if (typeof res.flush === 'function') res.flush();
       }
     } catch (streamError) {
@@ -116,6 +115,15 @@ app.post('/chat-stream', async (req, res) => {
     );
     res.end();
   }
+});
+
+// Global error handler (handles JSON parse errors and other uncaught errors)
+app.use((err, req, res, next) => {
+  if (err.message === 'Invalid JSON format') {
+    return res.status(400).json({ error: err.message });
+  }
+  console.error('Unhandled error:', err.stack || err);
+  res.status(500).json({ error: 'Internal server error' });
 });
 
 const PORT = process.env.PORT || 3000;
